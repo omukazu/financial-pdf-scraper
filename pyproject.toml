@@ -1,0 +1,42 @@
+[tool.poetry]
+name = "financial-pdf-scraper"
+version = "0.1.0"
+description = "Python Virtual Environment for Financial PDF Scraper"
+authors = ["Kazumasa Omura <omura@nlp.ist.i.kyoto-u.ac.jp>"]
+readme = "README.md"
+
+packages = [
+    { include = "financial_pdf_scraper", from = "src" }
+]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<4.0"
+pdfminer-six = "<=20250327"
+reportlab = ">=4.2.5,<5.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+# cf. https://docs.astral.sh/ruff/settings/
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+# [tool.ruff.format]
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle
+    "F",  # Pyflakes
+    "I",  # isort
+]
+ignore = [
+    "E203",  # whitespace before ":"
+    "E501",  # line-too-long
+    # Ruff doesn't enable pycodestyle warnings (W)
+    # "W503",  # line break occurred before a binary operator
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["financial_pdf_scraper"]
