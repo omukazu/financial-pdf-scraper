@@ -4,7 +4,7 @@ from itertools import chain, pairwise
 from pathlib import Path
 
 from pdfminer.converter import PDFPageAggregator
-from pdfminer.layout import LAParams, LTChar, LTContainer, LTCurve, LTTextLine, TextLineElement
+from pdfminer.layout import LAParams, LTAnno, LTChar, LTContainer, LTCurve, LTTextLine, TextLineElement
 from pdfminer.pdfdocument import PDFDocument
 from pdfminer.pdfinterp import PDFPageInterpreter, PDFResourceManager
 from pdfminer.pdfpage import PDFPage
@@ -98,23 +98,25 @@ class Page:
 
         aggregated = []
         for clustered in y2lt_text_lines.values():
-            # x0が小さい順（左から右へ）にソート
-            lt_chars = sorted(
-                [tle for tle in chain.from_iterable(clustered) if self.is_valid_text_line_element(tle)],
-                key=lambda x: x.x0,
-            )
-            self.remove_overlapping_lt_chars(lt_chars)
-            text = "".join(ltc.get_text() for ltc in lt_chars)
+            tles = [
+                tle
+                for tle in chain.from_iterable(
+                    sorted(clustered, key=lambda x: x.x0)
+                )  # x0が小さい順（左から右へ）にソート
+                if self.is_valid_text_line_element(tle)
+            ]
+            self.remove_overlapping_lt_chars(tles)
+            text = "".join(tle.get_text() for tle in tles)
             if text == "" or text.isspace():  # 空白文字のみの行も除外
                 continue
-            if len(lt_chars) >= 1:
-                min_x0 = round(min(ltc.x0 for ltc in lt_chars))
-                min_y0 = round(min(ltc.y0 for ltc in lt_chars))
-                max_x1 = round(max(ltc.x1 for ltc in lt_chars))
-                max_y1 = round(max(ltc.y1 for ltc in lt_chars))
+            if len(tles) >= 1:
+                min_x0 = round(min(tle.x0 for tle in tles if isinstance(tle, LTChar)))
+                min_y0 = round(min(tle.y0 for tle in tles if isinstance(tle, LTChar)))
+                max_x1 = round(max(tle.x1 for tle in tles if isinstance(tle, LTChar)))
+                max_y1 = round(max(tle.y1 for tle in tles if isinstance(tle, LTChar)))
                 aggregated.append(
                     {
-                        "lt_chars": lt_chars,
+                        "tles": tles,
                         "table": any(
                             f.x0 - 1 <= min_x0 and f.y0 - 1 <= min_y0 and f.x1 + 1 >= max_x1 and f.y1 + 1 >= max_y1
                             for f in self.frames
@@ -149,21 +151,25 @@ class Page:
 
     @staticmethod
     def is_valid_text_line_element(text_line_element: TextLineElement) -> bool:
+        # TextLineElement = LTChar | LTAnno
+        char = text_line_element.get_text()
         if isinstance(text_line_element, LTChar):
-            char = text_line_element.get_text()
-            return (not char.isspace() or char == " ") and text_line_element.x0 >= 0.0 and text_line_element.y0 >= 0.0
+            return (char == " " or not char.isspace()) and text_line_element.x0 >= 0.0 and text_line_element.y0 >= 0.0
+        elif isinstance(text_line_element, LTAnno):
+            return char == " "
         else:
             return False
 
     @staticmethod
-    def remove_overlapping_lt_chars(lt_chars: list[LTChar]) -> None:
+    def remove_overlapping_lt_chars(valid_tles: list[TextLineElement]) -> None:
+        lt_chars = [tle for tle in valid_tles if isinstance(tle, LTChar)]
         overlapping_lt_chars = []
         for cur_lt_char, next_lt_char in pairwise(lt_chars):
             # 次の文字が重なっている場合は除外（だいたい見えない半角スペース）
             if cur_lt_char.x0 + cur_lt_char.width / 3 > next_lt_char.x0:
                 overlapping_lt_chars.append(next_lt_char)
         for overlapping_lt_char in overlapping_lt_chars:
-            lt_chars.remove(overlapping_lt_char)
+            valid_tles.remove(overlapping_lt_char)
 
     def to_text(
         self,
@@ -179,21 +185,23 @@ class Page:
                 if include_table is True:
                     text += "\n" * int(prev_line["table"] is False)  # "<table>"
                     tr = ""  # "<tr>"
-                    for cur_lt_char, next_lt_char in zip(
-                        cur_line["lt_chars"], cur_line["lt_chars"][1:] + cur_line["lt_chars"][:1]
-                    ):
-                        tr += cur_lt_char.get_text()
-                        # 2文字以上離れていたら別カラムとみなす
-                        tr += "  " * int(next_lt_char.x0 - cur_lt_char.x1 >= cur_lt_char.width * 2.125)
+                    for cur_tle, next_tle in zip(cur_line["tles"], cur_line["tles"][1:] + cur_line["tles"][:1]):
+                        tr += cur_tle.get_text()
+                        try:
+                            # 2文字以上離れていたら別カラムとみなす
+                            distant = next_tle.x0 - cur_tle.x1 >= cur_tle.width * 2.125
+                        except AttributeError:
+                            distant = False
+                        tr += "  " * int(distant)
                     tr += "\n"  # "</tr>"
                     text += tr
                     text += "\n" * int(next_line["table"] is False)  # "</table>"
             elif cur_line["header"] is True or cur_line["footer"] is True:
                 if include_header_and_footer is True:
-                    text += "".join(lc.get_text() for lc in cur_line["lt_chars"])
+                    text += "".join(tle.get_text() for tle in cur_line["tles"])
                     text += "  " * cur_line["line_break"] * include_line_break
             else:
-                text += "".join(lc.get_text() for lc in cur_line["lt_chars"])
+                text += "".join(tle.get_text() for tle in cur_line["tles"])
                 text += "  " * cur_line["line_break"] * include_line_break
         return text
 
