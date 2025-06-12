@@ -14,6 +14,9 @@ INVERTER = {v: k for k, v in CONVERTER.items()}
 
 
 def segment_text_into_sentences(text: str, punct_marks: str = "。") -> list[str]:
+    if "." in punct_marks and "\." not in punct_marks:
+        raise ValueError('must escape period (".")')
+
     balanced = _balance(text)
 
     sentences = []
