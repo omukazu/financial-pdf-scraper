@@ -1,29 +1,31 @@
-[tool.poetry]
+[project]
 name = "financial-pdf-scraper"
 version = "0.1.0"
 description = "Python Virtual Environment for Financial PDF Scraper"
-authors = ["Kazumasa Omura <omura@nlp.ist.i.kyoto-u.ac.jp>"]
+authors = [{ name = "Kazumasa Omura", email = "omukazu5313@gmail.com" }]
+requires-python = ">=3.10"
 readme = "README.md"
-
-packages = [
-    { include = "financial_pdf_scraper", from = "src" }
+dependencies = [
+    "pdfminer-six<=20250327",
+    "reportlab>=4.2.5,<5.0.0",
 ]
 
-[tool.poetry.dependencies]
-python = ">=3.10,<4.0"
-pdfminer-six = "<=20250327"
-reportlab = ">=4.2.5,<5.0.0"
+[tool.hatch.build.targets.sdist]
+include = ["src/financial_pdf_scraper"]
+
+[tool.hatch.build.targets.wheel]
+include = ["src/financial_pdf_scraper"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src/financial_pdf_scraper" = "financial_pdf_scraper"
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-# cf. https://docs.astral.sh/ruff/settings/
 [tool.ruff]
 line-length = 120
 target-version = "py310"
-
-# [tool.ruff.format]
 
 [tool.ruff.lint]
 select = [
