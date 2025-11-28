@@ -174,6 +174,7 @@ class Page:
     def to_text(
         self,
         include_table: bool = False,
+        replacement: str = "",
         include_line_break: bool = False,
         include_header_and_footer: bool = False,
     ) -> str:
@@ -196,6 +197,8 @@ class Page:
                     tr += "\n"  # "</tr>"
                     text += tr
                     text += "\n" * int(next_line["table"] is False)  # "</table>"
+                else:
+                    text += replacement
             elif cur_line["header"] is True or cur_line["footer"] is True:
                 if include_header_and_footer is True:
                     text += "".join(tle.get_text() for tle in cur_line["tles"])
